@@ -11,6 +11,22 @@ datasource db {
 }
 
 model User {
-  id   String @id @default(uuid())
-  name String
+  id        String @id @default(uuid())
+  githubId  Int    @unique
+  name      String
+  login     String
+  avatarUrl String
+
+  posts Post[]
+}
+
+model Post {
+  id        String   @id @default(uuid())
+  authorId  String
+  content   String
+  coverImg  String? //Caminho da imagem
+  isPublic  Boolean  @default(false)
+  createdAt DateTime @default(now())
+
+  author User @relation(fields: [authorId], references: [id])
 }
