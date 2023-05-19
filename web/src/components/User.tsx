@@ -1,17 +1,26 @@
-import { User2 } from "lucide-react";
+import Image from "next/image";
+import { getUser } from "@/lib/auth";
 import React from "react";
 
 function User() {
+  const { name, avatarUrl } = getUser();
+
   return (
-    <a href="" className="flex items-center space-x-3 hover:text-gray-50">
-      <div className="rounded-full bg-white/20 p-3">
-        <User2 size={24} />
+    <div className="flex items-center space-x-3">
+      <Image
+        src={avatarUrl}
+        width={48}
+        height={48}
+        alt=""
+        className="rounded-full"
+      />
+      <div className="flex flex-col">
+        <p className="w-36 text-sm">{name}</p>
+        <a href="" className="w-36 text-sm text-red-500 hover:text-red-400">
+          Sair
+        </a>
       </div>
-      <p className="w-36 text-sm">
-        <span className="underline ">Crie sua conta</span> e salve suas
-        memórias!
-      </p>
-    </a>
+    </div>
   );
 }
 

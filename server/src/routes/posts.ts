@@ -3,9 +3,16 @@ import { prisma } from "../lib/prisma";
 import { FastifyInstance } from "fastify";
 
 export async function postsRoutes(app: FastifyInstance) {
+  app.addHook("preHandler", async (request) => {
+    await request.jwtVerify();
+  });
+
   // Listar todas as postagens
-  app.get("/posts", async () => {
-    const allPosts = await prisma.post.findMany({ orderBy: { createdAt: "asc" } });
+  app.get("/posts", async (request) => {
+    const allPosts = await prisma.post.findMany({
+      where: { authorId: request.user.sub },
+      orderBy: { createdAt: "asc" },
+    });
 
     return allPosts.map((post) => {
       return {
@@ -17,7 +24,7 @@ export async function postsRoutes(app: FastifyInstance) {
   });
 
   // Rota para obter uma postagem por ID
-  app.get("/posts/:id", async (request) => {
+  app.get("/posts/:id", async (request, reply) => {
     const paramsSchema = z.object({
       postId: z.string().uuid(),
     });
@@ -26,20 +33,23 @@ export async function postsRoutes(app: FastifyInstance) {
 
     const post = await prisma.post.findUniqueOrThrow({ where: { id: postId } });
 
+    if (!post.isPublic && post.authorId !== request.user.sub) {
+      return reply.status(401).send({ error: "You are not allowed to access this post" });
+    }
+
     return post;
   });
 
   // Rota para criar uma nova postagem
   app.post("/posts", async (request) => {
     const bodySchema = z.object({
-      authorId: z.string().uuid(),
       content: z.string(),
       coverImg: z.string().url().optional(),
       isPublic: z.coerce.boolean().default(false),
     });
 
-    const { authorId, isPublic, content, coverImg } = bodySchema.parse(request.body);
-    const newPost = { isPublic, content, coverImg, authorId };
+    const { isPublic, content, coverImg } = bodySchema.parse(request.body);
+    const newPost = { isPublic, content, coverImg, authorId: request.user.sub };
 
     const post = await prisma.post.create({ data: newPost });
 
@@ -47,7 +57,7 @@ export async function postsRoutes(app: FastifyInstance) {
   });
 
   // Rota para atualizar uma postagem existente
-  app.put("/posts/:id", async (request) => {
+  app.put("/posts/:id", async (request, reply) => {
     const paramsSchema = z.object({
       postId: z.string().uuid(),
     });
@@ -62,18 +72,30 @@ export async function postsRoutes(app: FastifyInstance) {
 
     const { isPublic, content, coverImg } = bodySchema.parse(request.body);
 
+    let post = await prisma.post.findUniqueOrThrow({ where: { id: postId } });
+
+    if (post.authorId !== request.user.sub) {
+      return reply.status(401).send({ error: "You are not allowed to access this post" });
+    }
+
     const updatedPost = await prisma.post.update({ where: { id: postId }, data: { isPublic, content, coverImg } });
 
     return updatedPost;
   });
 
   // Rota para excluir uma postagem
-  app.delete("/posts/:id", async (request) => {
+  app.delete("/posts/:id", async (request, reply) => {
     const paramsSchema = z.object({
       postId: z.string().uuid(),
     });
 
     const { postId } = paramsSchema.parse(request.params);
+
+    const post = await prisma.post.findUniqueOrThrow({ where: { id: postId } });
+
+    if (post.authorId !== request.user.sub) {
+      return reply.status(401).send({ error: "You are not allowed to access this post" });
+    }
 
     await prisma.post.delete({ where: { id: postId } });
   });
